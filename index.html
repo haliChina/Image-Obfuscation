@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ImgObf</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0e0e0f;
+  --bg2: #161618;
+  --bg3: #1e1e21;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #e8e6e1;
+  --text2: #8a8882;
+  --text3: #5a5856;
+  --amber: #EF9F27;
+  --amber-dim: rgba(239,159,39,0.12);
+  --green: #639922;
+  --green-dim: rgba(99,153,34,0.12);
+  --red: #E24B4A;
+  --red-dim: rgba(226,75,74,0.12);
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f4f0;
+    --bg2: #eeede9;
+    --bg3: #e5e4e0;
+    --border: rgba(0,0,0,0.08);
+    --border2: rgba(0,0,0,0.14);
+    --text: #1a1a1a;
+    --text2: #666460;
+    --text3: #999690;
+  }
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  font-size: 14px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+#app {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#drop-zone {
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--radius);
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--bg2);
+  overflow: hidden;
+  position: relative;
+  padding: 1.5rem;
+}
+#drop-zone.drag-over { border-color: var(--amber); background: var(--amber-dim); }
+#drop-zone.has-image { cursor: default; min-height: 280px; }
+#file-input { display: none; }
+#preview { max-width: 100%; max-height: 420px; border-radius: var(--radius-sm); display: none; object-fit: contain; }
+#drop-zone.has-image #preview { display: block; }
+#drop-zone.has-image .placeholder { display: none; }
+.placeholder { display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; }
+.placeholder .hint { font-size: 13px; color: var(--text2); }
+.placeholder .sub { font-size: 11px; color: var(--text3); }
+.icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+.icon-sm { width: 16px; height: 16px; }
+.icon-lg { width: 36px; height: 36px; color: var(--text3); }
+#controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 16px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.08s;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--bg3); border-color: var(--border2); }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn.amber { border-color: rgba(239,159,39,0.4); color: var(--amber); }
+.btn.amber:hover:not(:disabled) { background: var(--amber-dim); }
+.btn.green { border-color: rgba(99,153,34,0.4); color: var(--green); }
+.btn.green:hover:not(:disabled) { background: var(--green-dim); }
+.btn.red { border-color: rgba(226,75,74,0.4); color: var(--red); }
+.btn.red:hover:not(:disabled) { background: var(--red-dim); }
+#status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg2);
+  font-size: 12px;
+  color: var(--text2);
+  border: 1px solid var(--border);
+  min-height: 42px;
+}
+#status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--text3);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+#status-dot.busy { background: var(--amber); animation: pulse 0.9s infinite; }
+#status-dot.ok   { background: var(--green); }
+#status-dot.err  { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+canvas { display: none; }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="ico-photo-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 8h.01"/>
+    <path d="M12.5 21h-6.5a3 3 0 0 1-3-3v-12a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v6.5"/>
+    <path d="M3 16l5-5c.928-.893 2.072-.893 3 0l3 3"/>
+    <path d="M14 14l1-1c.928-.893 2.072-.893 3 0"/>
+    <path d="M19 22v-6"/>
+    <path d="M22 19l-3-3-3 3"/>
+  </symbol>
+  <symbol id="ico-folder-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 19l2.757-7.351a1 1 0 0 1 .936-.649h12.307a1 1 0 0 1 .986 1.164l-.996 5.211a2 2 0 0 1-1.964 1.625h-14.026a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2h4l3 3h7a2 2 0 0 1 2 2v2"/>
+  </symbol>
+  <symbol id="ico-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="5" y="11" width="14" height="10" rx="2"/>
+    <circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/>
+    <path d="M8 11v-4a4 4 0 0 1 8 0v4"/>
+  </symbol>
+  <symbol id="ico-lock-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="5" y="11" width="14" height="10" rx="2"/>
+    <circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/>
+    <path d="M8 11v-5a4 4 0 0 1 8 0"/>
+  </symbol>
+  <symbol id="ico-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+    <path d="M7 11l5 5 5-5"/>
+    <path d="M12 4v12"/>
+  </symbol>
+  <symbol id="ico-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4"/>
+    <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+  </symbol>
+</svg>
+
+<div id="app">
+  <div id="drop-zone" onclick="handleClick(event)">
+    <div class="placeholder">
+      <svg class="icon icon-lg" aria-hidden="true"><use href="#ico-photo-up"/></svg>
+      <div class="hint">drop image here or click to select</div>
+      <div class="sub">Supports images in multiple formats</div>
+    </div>
+    <img id="preview" alt="preview" />
+  </div>
+
+  <div id="controls">
+    <button class="btn" onclick="document.getElementById('file-input').click()">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#ico-folder-open"/></svg> load
+    </button>
+    <button class="btn amber" id="btn-enc" disabled onclick="run('enc')">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#ico-lock"/></svg> encrypt
+    </button>
+    <button class="btn amber" id="btn-dec" disabled onclick="run('dec')">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#ico-lock-open"/></svg> decrypt
+    </button>
+    <button class="btn green" id="btn-dl" disabled onclick="dl()">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#ico-download"/></svg> download
+    </button>
+    <button class="btn red" id="btn-reset" disabled onclick="reset()">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#ico-refresh"/></svg> reset
+    </button>
+  </div>
+
+  <div id="status-bar">
+    <div id="status-dot"></div>
+    <span id="status-txt">ready - load an image to start</span>
+  </div>
+
+  <input type="file" id="file-input" accept="image/*" onchange="loadFile(this.files[0])">
+  <canvas id="cvs"></canvas>
+</div>
+
+<a href="https://notbyai.fyi" target="_blank" rel="noopener" style="position:fixed;bottom:16px;left:16px;display:block;line-height:0;z-index:99;opacity:0.85;transition:opacity 0.15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.85" aria-label="Developed by human, not by AI">
+<svg width="131" height="42" viewBox="0 0 131 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M0.5 0.5H116C124.008 0.5 130.5 6.99187 130.5 15V41.5H15C6.99187 41.5 0.5 35.0081 0.5 27V0.5Z" fill="black" stroke="#ACACAC"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M104.32 26.2505C104.32 25.9898 104.336 25.4196 104.336 25.4196H100.424V23.8717H104.573C104.764 26.2238 105.11 28.471 105.651 30.2984C104.776 31.2876 103.759 32.1157 102.612 32.7515C103.107 33.2077 103.953 34.2016 104.288 34.7067C105.138 34.1597 105.93 33.5082 106.658 32.7639C107.338 33.9391 108.193 34.6415 109.254 34.6415C110.898 34.6415 111.649 33.9572 112 30.78C111.377 30.5356 110.563 29.9817 110.036 29.4277C109.956 31.4155 109.765 32.2301 109.445 32.2301C109.06 32.2301 108.67 31.686 108.312 30.7655C109.465 29.1244 110.389 27.1985 111.058 25.0611L108.711 24.4908C108.396 25.6095 107.983 26.659 107.478 27.6243C107.264 26.4884 107.09 25.2105 106.974 23.8717H111.84V21.5418H110.142L110.946 20.6945C110.387 20.1568 109.27 19.4399 108.455 19L107.05 20.4175C107.553 20.7329 108.148 21.1437 108.647 21.5418H106.835C106.811 20.7923 106.808 20.0385 106.827 19.2933H104.384C104.387 20.0364 104.403 20.7892 104.433 21.5418H97.9812V26.4297C97.9812 28.5642 97.9014 31.4481 96.7199 33.3707C97.2468 33.6477 98.3006 34.5275 98.6997 35C99.5135 33.7498 99.9567 32.0088 100.189 30.2753C100.506 30.8638 100.745 31.7506 100.775 32.4257C101.51 32.4257 102.18 32.4094 102.612 32.3279C103.091 32.2301 103.458 32.0672 103.809 31.5947C104.192 31.0733 104.272 29.5743 104.32 26.2505ZM100.197 30.2141C100.316 29.3052 100.378 28.4 100.406 27.5703H102.058C102.023 29.1922 101.963 29.8644 101.829 30.0631C101.701 30.2261 101.558 30.275 101.35 30.275C101.102 30.275 100.674 30.2596 100.197 30.2141Z" fill="white"/>
+<path d="M85.8673 22.112C86.1314 21.4187 86.3672 20.705 86.565 19.9939L84.1541 19.4399C83.6112 21.6395 82.5893 23.8717 81.3599 25.2077C81.9507 25.5336 82.9885 26.2342 83.4515 26.6415C83.9297 26.0332 84.4007 25.2744 84.839 24.4257H87.9062V26.9185H83.7709V29.1996H87.9062V32.002H81.8708V34.3157H96.4005V32.002H90.3332V29.1996H94.9156V26.9185H90.3332V24.4257H95.5543V22.112H90.3332V19.277H87.9062V22.112H85.8673Z" fill="white"/>
+<path d="M46.3436 28.4645C46.4377 28.0285 46.4856 27.6141 46.4988 27.2444H42.8462V25.11H46.5026V23.4807H42.6866V21.2811H46.5026V19.3585H48.8018V27C48.8018 29.8513 47.9396 33.0611 44.0278 34.9837C43.6446 34.4134 42.9261 33.6802 42.3672 33.224C43.7784 32.6761 44.7414 31.786 45.3804 30.8057C44.6568 30.9237 43.9507 31.0375 43.2921 31.1436L42.4151 31.2851L42 28.9226C43.1273 28.8236 44.7056 28.6496 46.3436 28.4645Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M71.6755 34.3304L66.632 19.7975H63.2696L58.1875 34.3304H61.2986L62.2841 31.3429H67.5305L68.4484 34.3304H71.6755ZM64.9218 23.1201L66.6996 28.8386H63.0861L64.9218 23.1201Z" fill="white"/>
+<path d="M52.7456 19.3585V21.2811H56.9289V23.4807H52.7456V25.11H56.5457V27.2444H52.7456V28.9063H57.2163V31.1059H52.7456V34.7556H50.4144V19.3585H52.7456Z" fill="white"/>
+<path d="M74.2124 22.2695V31.8617H72.4582V34.3337H78.7189V31.8617H77.169V22.2695H78.7189V19.7975H72.4582V22.2695H74.2124Z" fill="white"/>
+<path d="M17.9605 24.1575C21.4266 26.9643 26.3836 26.9643 29.8497 24.1575L28.5095 22.5026C25.8248 24.6766 21.9854 24.6766 19.3007 22.5026L17.9605 24.1575Z" fill="white"/>
+<path d="M19.404 20.5134V17.6365H21.5336V20.5134H19.404Z" fill="white"/>
+<path d="M26.012 17.6365V20.5134H28.1415V17.6365H26.012Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M35 21.5C35 27.8513 29.8513 33 23.5 33C17.1487 33 12 27.8513 12 21.5C12 15.1487 17.1487 10 23.5 10C29.8513 10 35 15.1487 35 21.5ZM32.8705 21.5C32.8705 26.6752 28.6752 30.8705 23.5 30.8705C18.3248 30.8705 14.1295 26.6752 14.1295 21.5C14.1295 16.3248 18.3248 12.1295 23.5 12.1295C28.6752 12.1295 32.8705 16.3248 32.8705 21.5Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M67.6671 7.2041C67.8182 7.47681 67.9795 7.81996 68.0917 8.11771H65.7581V10.217C65.7581 11.7138 65.6682 13.8715 64.7486 15.4265C64.9085 15.5043 65.2084 15.7181 65.3283 15.8445C66.2533 14.261 66.4352 11.982 66.4471 10.392H70.8156V8.11771H68.8984C68.7876 7.79015 68.5772 7.33807 68.3668 7L67.6671 7.2041ZM66.4478 8.73001H70.1159V9.77969H66.4478V8.73001Z" fill="white"/>
+<path d="M62.07 12.8121C62.1499 12.987 62.2599 13.3175 62.2899 13.4535C62.4798 13.3466 62.7896 13.2494 64.9985 12.744C64.9785 12.5982 64.9485 12.3358 64.9485 12.1414L63.2886 12.482C63.9958 11.5915 64.6857 10.5043 65.2584 9.4298L64.6387 9.08962C64.4692 9.46314 64.2702 9.84208 64.0652 10.2017L62.9534 10.3135C63.5122 9.46429 64.0685 8.36503 64.4788 7.30129L63.7691 7.05831C63.4093 8.24406 62.7396 9.51727 62.5297 9.838C62.3298 10.1782 62.1599 10.4114 61.99 10.4503C62.07 10.635 62.1899 10.9751 62.2299 11.1209C62.3689 11.0534 62.5909 10.9931 63.677 10.8509C63.2884 11.4726 62.9315 11.9668 62.7696 12.1609C62.4798 12.5205 62.2699 12.7732 62.07 12.8121Z" fill="white"/>
+<path d="M63.9902 13.9974C63.238 14.2758 62.5364 14.5353 62.02 14.7073L62.1999 15.3682C62.4455 15.2709 62.7131 15.1656 62.9949 15.0547L62.9964 15.0541L63.0018 15.052C63.6475 14.7979 64.3677 14.5144 65.0685 14.2311L64.9385 13.6479C64.6204 13.7643 64.3006 13.8826 63.9902 13.9974Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M69.926 15.9319C69.896 15.7764 69.8261 15.5334 69.7461 15.3877H70.2259C70.2958 15.3877 70.3158 15.3682 70.3158 15.2905V13.8423H69.5762V15.6792H69.0664V13.8423H68.3568V15.6889H67.8471V13.8423H67.0275V15.9222H66.4278V11.2181H70.9155V15.3002C70.9155 15.5626 70.8755 15.7278 70.6956 15.825C70.5157 15.9222 70.2758 15.9319 69.926 15.9319ZM67.0275 11.8207H67.8471V13.2592H67.0275V11.8207ZM69.5762 11.8207H70.3158V13.2592H69.5762V11.8207ZM68.3568 13.2592H69.0664V11.8207H68.3568V13.2592Z" fill="white"/>
+<path d="M80.1604 7.66094C80.0811 8.67271 79.9239 10.1232 79.7645 11.3251H81C81 11.3251 80.99 11.5486 80.98 11.6555C80.7501 14.2797 80.5302 15.2905 80.1704 15.6501C79.9805 15.8542 79.7806 15.932 79.4808 15.9417C79.2309 15.9611 78.7711 15.9611 78.2814 15.9417C78.2714 15.7376 78.1914 15.4557 78.0815 15.2613C78.5612 15.3197 79.001 15.3197 79.1909 15.3197C79.3608 15.3197 79.4708 15.3002 79.5607 15.203C79.8302 14.9591 80.0478 14.0852 80.2377 11.9568H76.1824C76.3124 11.1696 76.4523 9.8672 76.5223 8.91472L77.2219 8.95359C77.1614 9.68948 77.0665 10.5981 76.9762 11.3251H79.0482C79.1782 10.3451 79.3104 9.15822 79.3904 8.30241H76.0425V7.63178H79.5207L79.6407 7.60263L80.1604 7.66094Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M71.8946 12.0346C72.6086 11.1148 73.0645 9.74332 73.3422 8.25381H72.1145V7.58319H75.5528V8.25381H74.0625C73.8968 9.06038 73.6875 9.8499 73.4245 10.5767H75.2629V14.7754H73.4238V15.5626H72.7642V12.0402C72.6043 12.3227 72.4314 12.5847 72.2444 12.8218C72.1945 12.6469 72.0245 12.229 71.8946 12.0346ZM74.6032 11.2279H73.4238V14.1242H74.6032V11.2279Z" fill="white"/>
+<path d="M56.1882 7.28164C56.1897 7.21582 56.1911 7.15388 56.1926 7.09712H57.0222L57.0212 7.13921C57.0132 7.48645 57.0024 7.95545 56.9577 8.5015C57.0986 9.64446 57.7071 13.767 61.27 15.3098C61.0502 15.4751 60.8303 15.7278 60.7203 15.9319C58.2074 14.7903 57.1248 12.3912 56.6334 10.575C56.1624 12.5205 55.0981 14.6959 52.6544 15.9707C52.5245 15.7764 52.2746 15.5528 52.0447 15.3973C56.0515 13.4258 56.1509 8.95727 56.1882 7.28494L56.1882 7.28387L56.1882 7.28164Z" fill="white"/>
+<path d="M47.5472 14.7851L48.017 14.2991C49.1464 14.649 50.3758 15.1058 51.1054 15.4752L50.4957 15.9806C49.8161 15.6112 48.6766 15.1447 47.5472 14.7851Z" fill="white"/>
+<path d="M45.0784 14.2991L45.7681 14.7268C44.9285 15.2225 43.5892 15.7279 42.5197 16C42.4098 15.8542 42.1599 15.6015 42 15.4654C43.0695 15.2127 44.4088 14.7171 45.0784 14.2991Z" fill="white"/>
+<path d="M79.5307 13.2398H75.7027V13.8909H79.5307V13.2398Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M43.6292 13.5216H42.1899V14.1436H51.0654V13.5216H49.6561V9.12854H46.8875V8.51623H50.8056V7.88448H46.8875V7.07779H46.1479V7.88448H42.4698V8.51623H46.1479V9.12854H43.6292V13.5216ZM44.3488 13.5216V12.8413H48.9065V13.5216H44.3488ZM48.9065 12.3747V11.7916H44.3488V12.3747H48.9065ZM44.3488 11.3154H48.9065V10.7419H44.3488V11.3154ZM44.3488 10.2851H48.9065V9.64365H44.3488V10.2851Z" fill="white"/>
+</svg>
+</a>
+
+<script>
+/*
+开始
+以下内容由 AI 总结
+1. Gilbert 曲线（广义 Hilbert 空间填充曲线）
+Hilbert 曲线是一种分形曲线，能以"Z字蛇形但保持空间局部性"的方式，把二维网格里的每个像素恰好访问一次，输出一个像素坐标的有序列表。Gilbert 版本把这推广到任意宽高的矩形（不要求 2 的幂次）。
+2. 黄金比例偏移（固定密钥）
+偏移量 offset = round((√5−1)/2 × W × H) 是黄金比例乘以像素总数。这不是随机密钥，而是一个确定性、无密钥的固定偏移。
+3. 沿曲线的循环移位（置换）
+加密：
+把曲线第 i 号位置的像素，搬到曲线第 (i+offset)%n 号位置
+解密：
+逆向——把第 (i+offset)%n 的像素搬回 i
+以上内容由 AI 总结
+结束
+*/
+function gilbert2d(w, h) {
+  const out = [];
+  if (w >= h) gen(0,0,w,0,0,h,out);
+  else        gen(0,0,0,h,w,0,out);
+  return out;
+}
+function gen(x,y,ax,ay,bx,by,out) {
+  const w=Math.abs(ax+ay), h=Math.abs(bx+by);
+  const dax=Math.sign(ax), day=Math.sign(ay);
+  const dbx=Math.sign(bx), dby=Math.sign(by);
+  if (h===1) { for(let i=0;i<w;i++){out.push([x,y]);x+=dax;y+=day;} return; }
+  if (w===1) { for(let i=0;i<h;i++){out.push([x,y]);x+=dbx;y+=dby;} return; }
+  let ax2=Math.floor(ax/2), ay2=Math.floor(ay/2);
+  let bx2=Math.floor(bx/2), by2=Math.floor(by/2);
+  const w2=Math.abs(ax2+ay2), h2=Math.abs(bx2+by2);
+  if (2*w>3*h) {
+    if((w2%2)&&(w>2)){ax2+=dax;ay2+=day;}
+    gen(x,y,ax2,ay2,bx,by,out);
+    gen(x+ax2,y+ay2,ax-ax2,ay-ay2,bx,by,out);
+  } else {
+    if((h2%2)&&(h>2)){bx2+=dbx;by2+=dby;}
+    gen(x,y,bx2,by2,ax2,ay2,out);
+    gen(x+bx2,y+by2,ax,ay,bx-bx2,by-by2,out);
+    gen(x+(ax-dax)+(bx2-dbx),y+(ay-day)+(by2-dby),-bx2,-by2,-(ax-ax2),-(ay-ay2),out);
+  }
+}
+
+const PHI = (Math.sqrt(5)-1)/2;
+let currentBlob=null, originalFile=null, busy=false;
+const preview=document.getElementById('preview');
+const cvs=document.getElementById('cvs');
+const ctx=cvs.getContext('2d');
+const dz=document.getElementById('drop-zone');
+
+function setStatus(state,msg){
+  const d=document.getElementById('status-dot');
+  d.className=state;
+  document.getElementById('status-txt').textContent=msg;
+}
+function setButtons(hasImg){
+  document.getElementById('btn-enc').disabled=!hasImg||busy;
+  document.getElementById('btn-dec').disabled=!hasImg||busy;
+  document.getElementById('btn-dl').disabled=!currentBlob;
+  document.getElementById('btn-reset').disabled=!hasImg;
+}
+function loadFile(file){
+  if(!file)return;
+  originalFile=file; currentBlob=null;
+  const url=URL.createObjectURL(file);
+  preview.onload=()=>{
+    dz.classList.add('has-image');
+    setStatus('ok',`loaded: ${file.name}  (${preview.naturalWidth}×${preview.naturalHeight})`);
+    setButtons(true);
+    URL.revokeObjectURL(url);
+  };
+  preview.src=url;
+}
+function handleClick(e){
+  if(dz.classList.contains('has-image'))return;
+  document.getElementById('file-input').click();
+}
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('image/'))loadFile(f);
+});
+
+function run(mode){
+  if(busy||!preview.src)return;
+  busy=true;
+  setStatus('busy', mode==='enc'?'encrypt...':'decrypt...');
+  setButtons(false);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    try{
+      const W=preview.naturalWidth, H=preview.naturalHeight;
+      cvs.width=W; cvs.height=H;
+      ctx.drawImage(preview,0,0);
+      const src=ctx.getImageData(0,0,W,H);
+      const dst=new ImageData(W,H);
+      const curve=gilbert2d(W,H);
+      const n=W*H, offset=Math.round(PHI*n);
+      for(let i=0;i<n;i++){
+        const [ox,oy]=curve[i];
+        const [nx,ny]=curve[(i+offset)%n];
+        const op=4*(ox+oy*W), np=4*(nx+ny*W);
+        if(mode==='enc') dst.data.set(src.data.subarray(op,op+4),np);
+        else             dst.data.set(src.data.subarray(np,np+4),op);
+      }
+      ctx.putImageData(dst,0,0);
+      cvs.toBlob(blob=>{
+        currentBlob=blob;
+        const url=URL.createObjectURL(blob);
+        preview.onload=()=>{
+          URL.revokeObjectURL(url);
+          busy=false;
+          setStatus('ok',`${mode==='enc'?'success(encrypt)':'success(decrypt)'} — ${W}×${H} · JPEG 0.95`);
+          setButtons(true);
+        };
+        preview.src=url;
+      },'image/jpeg',0.95);
+    }catch(e){
+      busy=false;
+      setStatus('err','error: '+e.message);
+      setButtons(true);
+    }
+  }));
+}
+
+function dl(){
+  if(!currentBlob)return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(currentBlob);
+  a.download='gilbert_obfuscated.jpg';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function reset(){
+  if(!originalFile)return;
+  currentBlob=null;
+  loadFile(originalFile);
+}
+</script>
+</body>
+</html>
