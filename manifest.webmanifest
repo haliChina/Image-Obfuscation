@@ -1,0 +1,9 @@
+{
+  "name": "ImgObf 图片混淆工具",
+  "short_name": "ImgObf",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e0e0f",
+  "theme_color": "#0e0e0f",
+  "icons": []
+}

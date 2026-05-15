@@ -1,0 +1,35 @@
+# ImgObf
+
+ImgObf 是一个在浏览器本地运行的图片混淆工具，用于在公开分享前对图像做可逆处理。
+
+## 主要功能
+- 上传图片并本地预览
+- 进行图像混淆与恢复
+- 下载处理后的图片
+
+## 公开页面
+- /
+- /about.html
+- /services.html
+- /pricing.html
+- /faq.html
+- /help.html
+- /privacy.html
+- /terms.html
+
+## 文档与FAQ
+- /README.md
+- /faq.html
+
+## 私密或不建议抓取区域
+- /api/*
+- /admin/*
+- /dashboard/*
+- /user/*
+- /login
+- /register
+- /checkout
+- /payment/*
+- /pay/*
+- /notify
+- /callback
