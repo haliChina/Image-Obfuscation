@@ -137,9 +137,29 @@ body {
 #status-dot.err  { background: var(--red); }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
 canvas { display: none; }
+@media (min-width: 0px) {
+  #notice-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: #FFD400;
+    color: #1a1a1a;
+    text-align: center;
+    padding: 10px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    border-bottom: 1px solid rgba(0,0,0,0.12);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  body { padding-top: calc(2rem + 48px); }
+}
 </style>
 </head>
 <body>
+
+<div id="notice-bar">由于聊天软件在发送图片时会压缩画质，请发送时以文件形式发送或勾选原图</div>
 
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
   <symbol id="ico-photo-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -211,7 +231,7 @@ canvas { display: none; }
   <canvas id="cvs"></canvas>
 </div>
 
-<a href="https://notbyai.fyi" target="_blank" rel="noopener" style="position:fixed;bottom:16px;left:16px;display:block;line-height:0;z-index:99;opacity:0.85;transition:opacity 0.15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.85" aria-label="Developed by human, not by AI">
+<a href="https://github.com/haliChina/Image-Obfuscation" target="_blank" rel="noopener" style="position:fixed;bottom:16px;left:16px;display:block;line-height:0;z-index:99;opacity:0.85;transition:opacity 0.15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.85" aria-label="GitHub repository">
 <svg width="131" height="42" viewBox="0 0 131 42" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M0.5 0.5H116C124.008 0.5 130.5 6.99187 130.5 15V41.5H15C6.99187 41.5 0.5 35.0081 0.5 27V0.5Z" fill="black" stroke="#ACACAC"/>
 <path fill-rule="evenodd" clip-rule="evenodd" d="M104.32 26.2505C104.32 25.9898 104.336 25.4196 104.336 25.4196H100.424V23.8717H104.573C104.764 26.2238 105.11 28.471 105.651 30.2984C104.776 31.2876 103.759 32.1157 102.612 32.7515C103.107 33.2077 103.953 34.2016 104.288 34.7067C105.138 34.1597 105.93 33.5082 106.658 32.7639C107.338 33.9391 108.193 34.6415 109.254 34.6415C110.898 34.6415 111.649 33.9572 112 30.78C111.377 30.5356 110.563 29.9817 110.036 29.4277C109.956 31.4155 109.765 32.2301 109.445 32.2301C109.06 32.2301 108.67 31.686 108.312 30.7655C109.465 29.1244 110.389 27.1985 111.058 25.0611L108.711 24.4908C108.396 25.6095 107.983 26.659 107.478 27.6243C107.264 26.4884 107.09 25.2105 106.974 23.8717H111.84V21.5418H110.142L110.946 20.6945C110.387 20.1568 109.27 19.4399 108.455 19L107.05 20.4175C107.553 20.7329 108.148 21.1437 108.647 21.5418H106.835C106.811 20.7923 106.808 20.0385 106.827 19.2933H104.384C104.387 20.0364 104.403 20.7892 104.433 21.5418H97.9812V26.4297C97.9812 28.5642 97.9014 31.4481 96.7199 33.3707C97.2468 33.6477 98.3006 34.5275 98.6997 35C99.5135 33.7498 99.9567 32.0088 100.189 30.2753C100.506 30.8638 100.745 31.7506 100.775 32.4257C101.51 32.4257 102.18 32.4094 102.612 32.3279C103.091 32.2301 103.458 32.0672 103.809 31.5947C104.192 31.0733 104.272 29.5743 104.32 26.2505ZM100.197 30.2141C100.316 29.3052 100.378 28.4 100.406 27.5703H102.058C102.023 29.1922 101.963 29.8644 101.829 30.0631C101.701 30.2261 101.558 30.275 101.35 30.275C101.102 30.275 100.674 30.2596 100.197 30.2141Z" fill="white"/>
@@ -373,7 +393,8 @@ function dl(){
   if(!currentBlob)return;
   const a=document.createElement('a');
   a.href=URL.createObjectURL(currentBlob);
-  a.download='gilbert_obfuscated.jpg';
+  const baseName=originalFile?originalFile.name.replace(/\.[^.]+$/,''):'image';
+  a.download=`${baseName}_obf.jpg`;
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
